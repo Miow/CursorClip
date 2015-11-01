@@ -69,20 +69,28 @@ VOID CALLBACK WinEventProcCallback(HWINEVENTHOOK hWinEventHook, DWORD dwEvent, H
 }
 
 
-VOID toggleCursorClipping() {
-	if (isClippingEnabled) {
+VOID toggleCursorClipping() 
+{
+	if (isClippingEnabled) 
+	{
 		// Freeing the cursor
 		ClipCursor(NULL);
 
 		// Removing the systray tooltip
-		notificationIconData.uFlags &= !NIF_TIP;
+		notificationIconData.szTip[0] = '\0';
+
+		// Changing systray icon
+		notificationIconData.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_INACTIVE));
 
 	}
-	else {
+	else
+	{
 		HWND hWnd = GetForegroundWindow();
 
 		if (hWnd != NULL) {
+			// Clipping cursor
 			GetWindowText(hWnd, clippedWindowName, MAX_CLIPPED_WINDOW_NAME_SIZE);
+			clipCursorToWindow(hWnd);
 			
 			// Changing the systray tooltip
 			_snwprintf_s(
@@ -90,10 +98,10 @@ VOID toggleCursorClipping() {
 				sizeof(notificationIconData.szTip),
 				L"Cursor clipped to: %s",
 				clippedWindowName);
-			notificationIconData.uFlags |= NIF_TIP;
 
+			// Changing systray icon
+			notificationIconData.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ACTIVE));
 
-			clipCursorToWindow(hWnd);
 		}
 
 	}
@@ -258,11 +266,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_TRAYICON:
 		if (lParam == WM_RBUTTONUP)
 		{
+
 			// Show the contextual menu
 			// Getting the cursor position
 			POINT curPoint;
 			GetCursorPos(&curPoint);
-			//SetForegroundWindow(hWnd); // Bugfix to properly hide the contextual menu
+			
+			// There is a bug in windows that requires us to do that in order for the 
+			// contextual menu to vanish properly
+			SetForegroundWindow(hWnd);
+
 
 			UINT clicked = TrackPopupMenu(
 				systrayMenu,
@@ -332,10 +345,12 @@ VOID initNotificationIcon(HWND hWnd) {
 	notificationIconData.uID = ID_TRAY_APP_ICON;			// ID of the notify objects
 	notificationIconData.uFlags = 
 		  NIF_MESSAGE				// Send a message to the callback function
-		| NIF_ICON;					// Promise a valid icon
+		| NIF_ICON					// Promise a valid icon
+		| NIF_TIP;					// Promise a tip
+	notificationIconData.szTip[0] = '\0';
 	notificationIconData.uCallbackMessage = WM_TRAYICON;		// Message to be sent to the callback
 	notificationIconData.uVersion = NOTIFYICON_VERSION_4;
-	notificationIconData.hIcon = LoadIcon(NULL, MAKEINTRESOURCE(IDI_WINLOGO));
+	notificationIconData.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_INACTIVE));
 
 
 	Shell_NotifyIcon(NIM_ADD, &notificationIconData);
